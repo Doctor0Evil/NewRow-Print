@@ -1,0 +1,65 @@
+SECTION,FOUNDATION-META
+ROW,meta,foundation,scalar,foundationid,tier1-neuromorph-foundation-v1,string,primarykey,Foundation spec ID
+ROW,meta,foundation,scalar,version,1.0.0,string,nonnull,Version
+ROW,meta,foundation,scalar,createdby,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,string,nonnull,Creator DID
+ROW,meta,foundation,scalar,createdat,2026-02-09T000000Z,timestamp,nonnull,Created at
+ROW,meta,foundation,array,juristags,USFDAEUMDRCHILENEURORIGHTS2023,string,nonnull,Tier-1 jurisdiction set
+ROW,meta,foundation,scalar,rohceiling,0.30,float,nonwaivable,Global RoH ceiling
+ROW,meta,foundation,flag,deviceless,true,bool,nonwaivable,No stimulation or actuation
+ROW,meta,foundation,flag,norelaxglobalfloors,true,bool,nonwaivable,No relaxation below global minsafe/maxsafe
+ROW,meta,foundation,flag,nofictionalcontent,true,bool,nonwaivable,Directive NR-SAFE-0001 active
+
+SECTION,CAPABILITY-TIERS
+ROW,cap,tier,enum,capmodelonly,CapModelOnly,string,nonnull,Theory/simulation only
+ROW,cap,tier,enum,caplabbench,CapLabBench,string,nonnull,Phantoms/synthetic only
+ROW,cap,tier,enum,capcontrolledhuman,CapControlledHuman,string,nonnull,Deviceless controlled human
+ROW,cap,tier,enum,capgeneraluse,CapGeneralUse,string,nonnull,General-use advisory services
+
+SECTION,NEURORIGHTS
+ROW,nr,axis,scalar,rohmodelid,roh-model-v1,string,nonnull,Active RoH model id
+ROW,nr,axis,scalar,neurorightsdoc,neurorights.json,string,nonnull,Neurorights declaration file
+ROW,nr,axis,flag,mentalprivacy,true,bool,nonwaivable,Mental privacy enforced
+ROW,nr,axis,flag,cognitivefreedom,true,bool,nonwaivable,Cognitive freedom enforced
+ROW,nr,axis,flag,psychintegrity,true,bool,nonwaivable,Psychological integrity enforced
+ROW,nr,axis,flag,noncommercialneurodata,true,bool,nonwaivable,No commercial use of neurodata
+
+SECTION,ROH-CONSTRAINTS
+ROW,roh,global,scalar,rohmax,0.30,float,nonwaivable,Hard RoH ceiling
+ROW,roh,global,flag,rohincreasingonly,true,bool,nonwaivable,RoH_after >= RoH_before
+ROW,roh,global,flag,rohmodelsingle,true,bool,nonwaivable,Single active RoH model per subject
+
+SECTION,ENVELOPE-RULES
+ROW,env,rule,condition,checkrangeimmutability, minsafe,maxsafe immutable per jurisdiction,string,readonly,Global floor invariance
+ROW,env,rule,condition,checkwarninsidefloor, minsafe <= minwarn <= maxwarn <= maxsafe,string,readonly,Warn bands inside floor
+ROW,env,rule,condition,unknownthreshold_simonly, unknown minsafe or maxsafe => axis simulation-only,string,readonly,Safest-first for unknowns
+
+SECTION,DOWNGRADE-GUARDS
+ROW,dg,meta,flag,autodowngradeenabled,false,bool,nonwaivable,Envelopes may only REQUEST downgrade
+ROW,dg,decision,flag,requiresdowngrade,,bool,derived,Envelope recommends downgrade
+ROW,dg,decision,flag,ownerdowngradeapproved,,bool,input,OwnerDecision flag
+ROW,dg,output,action,flag,requestcapabilitydowngrade,,bool,readonly, requiresdowngrade AND autodowngradeenabled AND ownerdowngradeapproved
+
+SECTION,REVERSAL-POLICY
+ROW,rev,capability,flag,allowneuromorphreversal,false,bool,nonwaivable,No evolution reversal by default
+ROW,rev,capability,flag,explicitreversalorder,,bool,input,Owner-signed reversal order
+ROW,rev,capability,flag,nosaferalternative,,bool,derived,All soft mitigations exhausted
+ROW,rev,capability,condition,canrevertcapability, explicitreversalorder true AND nosaferalternative true,string,readonly,Reversal last-resort condition
+
+SECTION,IEEE-ANCHORS
+ROW,std,ieee,scalar,ieee_eeg_old,IEEE-2010-2012,string,nullable,Legacy EEG standard
+ROW,std,ieee,scalar,ieee_eeg_new,IEEE-2010-2023,string,nonnull,Current EEG standard
+ROW,std,ieee,scalar,ieee_latest_acceptance,2026-07-05,date,nonnull,Last acceptance date for 2010-2012
+ROW,std,ieee,condition,check_ieee_evidence_valid, if evidence.standard == ieee_eeg_old and now > ieee_latest_acceptance then basemedicalok=false,string,readonly,Sunset enforcement
+
+SECTION,JURISLOCAL-CHILE
+ROW,jl,chi,flag,neurodataexceptional,true,bool,nonwaivable,Neurodata treated as exceptional
+ROW,jl,chi,flag,requires_neurorights_ok,true,bool,nonwaivable,Neurorights compliance required
+ROW,jl,chi,condition,check_chile_neurorights, jurisdiction==CHILENEURORIGHTS2023 => mentalprivacy && cognitivefreedom && psychintegrity,string,readonly,Hard neurorights precondition
+
+SECTION,OPERATION-MODE
+ROW,op,mode,enum,virtuallab,VirtualLab,string,nonnull,No live coupling
+ROW,op,mode,enum,livecoupling,LiveCoupling,string,nonnull,Subject-coupled
+ROW,op,mode,condition,block_live_without_stack, if mode==LiveCoupling and !PolicyStack.allpass then deny,string,readonly,Composite policy gate
+ROW,op,mode,condition,block_modelonly_live, if capabilitystate==CapModelOnly then deny_live_coupling,string,readonly,Model-only no coupling
+
+FOOTER,END-OF-SHARD
