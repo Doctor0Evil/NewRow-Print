@@ -1,0 +1,82 @@
+namespace NewRowPrint.Biophysical {
+
+enum DimensionKind {
+    EEG_BANDPOWER,
+    EEG_ALPHA_ENVELOPE,
+    HR_BPM,
+    HRV_SDNN,
+    HRV_RMSSD,
+    HRV_LF_HF,
+    EDA_TONIC_SCL,
+    EDA_PHASIC_RATE,
+    RESP_RATE,
+    GAZE_FIXATION_DURATION,
+    GAZE_SACCADE_RATE,
+    BLINK_RATE,
+    MOTION_HEAD_RMS
+}
+
+enum EnvelopeSeverity {
+    INFO,
+    WARN,
+    RISK
+}
+
+struct RangeSpec {
+    // Global, medically conservative bounds (Tier-1 verified).
+    min_safe : f32,
+    max_safe : f32,
+
+    // Inner band for adaptive tightening/relaxation.
+    min_warn : f32,
+    max_warn : f32,
+
+    // Max allowed rate-of-change per second (absolute value).
+    max_delta_per_sec : f32
+}
+
+struct TransitionRule {
+    // How many consecutive WARN/RISK epochs trigger escalation.
+    warn_epochs_to_flag : u16,
+    risk_epochs_to_downgrade : u16,
+
+    // Minimum cooldown time before re-elevation (seconds).
+    cooldown_secs_min : u32
+}
+
+struct EnvelopeAxis {
+    id            : string,        // e.g. "eeg_alpha_occipital", "hr_bpm"
+    kind          : DimensionKind,
+    range         : RangeSpec,
+    transitions   : TransitionRule,
+
+    // Mapping into RoH / neurorights model (optional, but useful).
+    roh_axis_id   : string,        // e.g. "cognitive_load", "fatigue"
+    weight_in_roh : f32            // contribution when violating
+}
+
+struct BiophysicalEnvelopeSpec {
+    // Identifier and provenance
+    spec_id       : string,        // e.g. "cognitive_load_v1"
+    version       : string,
+    created_by    : string,        // DID / ALN identity
+    created_at    : timestamp,
+
+    // Capability state this spec applies to.
+    // Example: CAP_MODEL_ONLY may have empty axes; CAP_CONTROLLED_HUMAN full set.
+    capability_state : string,     // "CapModelOnly" | "CapLabBench" | ...
+
+    // Jurisdiction tags (tie into POLICY_STACK JURIS_LOCAL).
+    juris_tags    : string[],      // e.g. ["US_FDA", "EU_MDR"]
+
+    // Envelope definitions per axis.
+    axes          : EnvelopeAxis[],
+
+    // Global RoH ceiling for this spec (0.0–0.3 in your stack).
+    roh_ceiling   : f32,
+
+    // Whether violations must trigger automatic capability downgrade.
+    auto_downgrade_enabled : bool
+}
+
+}
