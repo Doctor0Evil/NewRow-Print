@@ -1,0 +1,86 @@
+use NewRowPrint.Biophysical::*;
+
+BiophysicalEnvelopeSpec {
+    spec_id            = "cognitive_load_envelope_v1",
+    version            = "1.0.0",
+    created_by         = "bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7",
+    created_at         = "2026-02-09T00:00:00Z",
+    capability_state   = "CapControlledHuman",
+    juris_tags         = ["US_FDA", "EU_MDR"],
+    roh_ceiling        = 0.30,
+    auto_downgrade_enabled = true,
+
+    axes = [
+        EnvelopeAxis {
+            id          = "eda_tonic_scl",
+            kind        = EDA_TONIC_SCL,
+            range       = RangeSpec {
+                min_safe          = 0.5,    // µS, conservative lower bound
+                max_safe          = 20.0,   // µS, above which overload risk grows[web:6]
+                min_warn          = 0.5,
+                max_warn          = 12.0,   // warning band before risk
+                max_delta_per_sec = 2.0
+            },
+            transitions = TransitionRule {
+                warn_epochs_to_flag   = 3,   // 3 consecutive epochs → overload flag
+                risk_epochs_to_downgrade = 1 // immediate downgrade on hard breach
+            },
+            roh_axis_id   = "cognitive_load",
+            weight_in_roh = 0.25
+        },
+
+        EnvelopeAxis {
+            id          = "hrv_rmssd",
+            kind        = HRV_RMSSD,
+            range       = RangeSpec {
+                min_safe          = 20.0,   // ms, low RMSSD indicates stress[web:6]
+                max_safe          = 200.0,
+                min_warn          = 25.0,
+                max_warn          = 160.0,
+                max_delta_per_sec = 10.0
+            },
+            transitions = TransitionRule {
+                warn_epochs_to_flag   = 3,
+                risk_epochs_to_downgrade = 2
+            },
+            roh_axis_id   = "cognitive_load",
+            weight_in_roh = 0.25
+        },
+
+        EnvelopeAxis {
+            id          = "hr_bpm",
+            kind        = HR_BPM,
+            range       = RangeSpec {
+                min_safe          = 45.0,
+                max_safe          = 140.0,  // conservative ceiling for desk work[web:6]
+                min_warn          = 50.0,
+                max_warn          = 120.0,
+                max_delta_per_sec = 5.0
+            },
+            transitions = TransitionRule {
+                warn_epochs_to_flag   = 3,
+                risk_epochs_to_downgrade = 1
+            },
+            roh_axis_id   = "cognitive_load",
+            weight_in_roh = 0.20
+        },
+
+        EnvelopeAxis {
+            id          = "eeg_alpha_cve",
+            kind        = EEG_ALPHA_ENVELOPE,
+            range       = RangeSpec {
+                min_safe          = 0.25,   // CVE range where alpha is near-Gaussian[web:13]
+                max_safe          = 0.75,
+                min_warn          = 0.30,
+                max_warn          = 0.70,
+                max_delta_per_sec = 0.05
+            },
+            transitions = TransitionRule {
+                warn_epochs_to_flag   = 4,
+                risk_epochs_to_downgrade = 2
+            },
+            roh_axis_id   = "cognitive_load",
+            weight_in_roh = 0.30
+        }
+    ]
+}
