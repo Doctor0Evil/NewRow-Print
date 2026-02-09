@@ -1,0 +1,49 @@
+namespace NewRowPrint.PolicyEngine {
+
+  enum CapabilityState {
+    MODEL_ONLY,        // No live human signals, synthetic/simulated only
+    LAB_BENCH,         // In vitro / phantom rigs, no direct human coupling
+    CONTROLLED_HUMAN,  // IRB/ethics-approved, monitored subjects
+    GENERAL_USE        // Cleared clinical / citizen deployment
+  }
+
+  enum Jurisdiction {
+    US_FDA,
+    EU_MDR,
+    NATIONAL_NEUROTECH,
+    GLOBAL_QAI_GOV
+  }
+
+  enum HarmClass {
+    NONE,
+    PROHIBITED_COERCIVE_NEUROMODULATION,
+    PROHIBITED_NONCONSENSUAL_SURVEILLANCE,
+    OTHER_RISK
+  }
+
+  struct BiophysicalEnvelope {
+    // Parameterized safety limits; values to be filled from validated datasets
+    eeg_bandpower_max_alpha   : f32,
+    eeg_bandpower_max_gamma   : f32,
+    eda_conductance_max       : f32,
+    bpm_min                   : u16,
+    bpm_max                   : u16,
+    stim_current_max_mA       : f32,
+    stim_charge_density_max   : f32,
+    // Envelope tightness in [0.0, 1.0]: 0 = strict, 1 = relaxed (within validated space)
+    adaptivity_level          : f32
+  }
+
+  struct PolicyContext {
+    current_state     : CapabilityState,
+    requested_state   : CapabilityState,
+    jurisdiction_set  : Jurisdiction[],
+    envelope          : BiophysicalEnvelope,
+    harm_class        : HarmClass,
+    // cryptographic + audit references
+    boot_session_id   : bytes32,
+    last_state_hash   : bytes32,
+    pq_signature      : bytes[], // PQC signature over last transition
+  }
+
+}
