@@ -1,0 +1,99 @@
+SECTION,ENVELOPE-META
+ROW,meta,envelope,scalar,envelope_id,cognitive-load-envelope-v1,string,primarykey,Unique envelope spec ID
+ROW,meta,envelope,scalar,version,1.0.0,string,nonnull,Version tag
+ROW,meta,envelope,scalar,created_by,bostrom18sd2ujv24ual9c9pshtxys6j8knh6xaead9ye7,string,nonnull,Creator DID
+ROW,meta,envelope,scalar,created_at,2026-02-09T00:00:00Z,timestamp,nonnull,Creation time
+ROW,meta,envelope,enum,capability_state,CapControlledHuman,string,nonnull,NewRow-Print capability state
+ROW,meta,envelope,array,juris_tags,US_FDA|EU_MDR,string[],nonnull,Jurisdiction tags
+ROW,meta,envelope,scalar,roh_ceiling,0.30,float,nonnull,Global RoH ceiling for this envelope
+ROW,meta,envelope,flag,auto_downgrade_enabled,true,bool,nonwaivable,Auto-downgrade on RISK
+
+SECTION,AXES
+ROW,axis,eda,scalar,axis_id,eda_tonic_scl,string,primarykey,Axis identifier
+ROW,axis,eda,enum,dimension_kind,EDA_TONIC_SCL,string,nonnull,Dimension enum
+ROW,axis,eda,scalar,min_safe,0.5,float,nonnull,Global safe lower bound (µS)
+ROW,axis,eda,scalar,max_safe,20.0,float,nonnull,Global safe upper bound (µS)
+ROW,axis,eda,scalar,min_warn,0.5,float,nonnull,Warn lower bound (µS)
+ROW,axis,eda,scalar,max_warn,12.0,float,nonnull,Warn upper bound (µS)
+ROW,axis,eda,scalar,max_delta_per_sec,2.0,float,nonnull,Max change per second
+ROW,axis,eda,scalar,warn_epochs_to_flag,3,int,nonnull,Consecutive WARN epochs before flag
+ROW,axis,eda,scalar,risk_epochs_to_downgrade,1,int,nonnull,Consecutive RISK epochs before downgrade
+ROW,axis,eda,scalar,roh_axis_id,cognitive_load,string,nonnull,RoH axis reference
+ROW,axis,eda,scalar,weight_in_roh,0.25,float,nonnull,Contribution to RoH
+
+ROW,axis,hrv,scalar,axis_id,hrv_rmssd,string,primarykey,Axis identifier
+ROW,axis,hrv,enum,dimension_kind,HRV_RMSSD,string,nonnull,Dimension enum
+ROW,axis,hrv,scalar,min_safe,20.0,float,nonnull,Safe lower bound (ms)
+ROW,axis,hrv,scalar,max_safe,200.0,float,nonnull,Safe upper bound (ms)
+ROW,axis,hrv,scalar,min_warn,25.0,float,nonnull,Warn lower bound (ms)
+ROW,axis,hrv,scalar,max_warn,160.0,float,nonnull,Warn upper bound (ms)
+ROW,axis,hrv,scalar,max_delta_per_sec,10.0,float,nonnull,Max change per second
+ROW,axis,hrv,scalar,warn_epochs_to_flag,3,int,nonnull,Consecutive WARN epochs before flag
+ROW,axis,hrv,scalar,risk_epochs_to_downgrade,2,int,nonnull,Consecutive RISK epochs before downgrade
+ROW,axis,hrv,scalar,roh_axis_id,cognitive_load,string,nonnull,RoH axis reference
+ROW,axis,hrv,scalar,weight_in_roh,0.25,float,nonnull,Contribution to RoH
+
+ROW,axis,hr,scalar,axis_id,hr_bpm,string,primarykey,Axis identifier
+ROW,axis,hr,enum,dimension_kind,HR_BPM,string,nonnull,Dimension enum
+ROW,axis,hr,scalar,min_safe,45.0,float,nonnull,Safe lower bound (BPM)
+ROW,axis,hr,scalar,max_safe,140.0,float,nonnull,Safe upper bound (BPM)
+ROW,axis,hr,scalar,min_warn,50.0,float,nonnull,Warn lower bound (BPM)
+ROW,axis,hr,scalar,max_warn,120.0,float,nonnull,Warn upper bound (BPM)
+ROW,axis,hr,scalar,max_delta_per_sec,5.0,float,nonnull,Max change per second
+ROW,axis,hr,scalar,warn_epochs_to_flag,3,int,nonnull,Consecutive WARN epochs before flag
+ROW,axis,hr,scalar,risk_epochs_to_downgrade,1,int,nonnull,Consecutive RISK epochs before downgrade
+ROW,axis,hr,scalar,roh_axis_id,cognitive_load,string,nonnull,RoH axis reference
+ROW,axis,hr,scalar,weight_in_roh,0.20,float,nonnull,Contribution to RoH
+
+ROW,axis,eeg,scalar,axis_id,eeg_alpha_cve,string,primarykey,Axis identifier
+ROW,axis,eeg,enum,dimension_kind,EEG_ALPHA_ENVELOPE,string,nonnull,Dimension enum
+ROW,axis,eeg,scalar,min_safe,0.25,float,nonnull,Safe lower bound (CVE)
+ROW,axis,eeg,scalar,max_safe,0.75,float,nonnull,Safe upper bound (CVE)
+ROW,axis,eeg,scalar,min_warn,0.30,float,nonnull,Warn lower bound (CVE)
+ROW,axis,eeg,scalar,max_warn,0.70,float,nonnull,Warn upper bound (CVE)
+ROW,axis,eeg,scalar,max_delta_per_sec,0.05,float,nonnull,Max change per second
+ROW,axis,eeg,scalar,warn_epochs_to_flag,4,int,nonnull,Consecutive WARN epochs before flag
+ROW,axis,eeg,scalar,risk_epochs_to_downgrade,2,int,nonnull,Consecutive RISK epochs before downgrade
+ROW,axis,eeg,scalar,roh_axis_id,cognitive_load,string,nonnull,RoH axis reference
+ROW,axis,eeg,scalar,weight_in_roh,0.30,float,nonnull,Contribution to RoH
+
+SECTION,INPUTS
+ROW,input,signal,scalar,subject_id,,string,nonnull,Rights-bearing subject ID
+ROW,input,signal,scalar,epoch_dur_secs,,float,nonnull,Epoch duration seconds
+ROW,input,signal,scalar,eda_tonic_scl,,float,nullable,Current epoch mean SCL
+ROW,input,signal,scalar,hrv_rmssd,,float,nullable,Current epoch RMSSD
+ROW,input,signal,scalar,hr_bpm,,float,nullable,Current epoch heart rate
+ROW,input,signal,scalar,eeg_alpha_cve,,float,nullable,Current epoch alpha CVE
+
+SECTION,DECISIONS
+ROW,decision,envelope,enum,axis_state,,string,INFO,WARN,RISK,Per-axis state label
+ROW,decision,envelope,flag,envelope_in_violation,,bool,derived,True if any axis in RISK
+ROW,decision,envelope,flag,requires_downgrade,,bool,derived,True if risk_epochs_to_downgrade met
+ROW,decision,envelope,flag,requires_cooldown,,bool,derived,True if cooldown not yet satisfied
+
+SECTION,ENFORCEMENT-RULES
+ROW,rule,enforce,condition,check_within_safe,
+"forall axis: min_safe <= value <= max_safe",
+string,readonly,Hard safety envelope
+ROW,rule,enforce,condition,check_warn_band,
+"axis_state = WARN if value in [min_warn,max_warn] and trend rising",
+string,readonly,Early warning classification
+ROW,rule,enforce,condition,check_risk_band,
+"axis_state = RISK if value outside [min_safe,max_safe] or delta > max_delta_per_sec",
+string,readonly,Risk classification
+ROW,rule,enforce,condition,aggregate_violation,
+"envelope_in_violation = exists axis with axis_state = RISK",
+string,readonly,Aggregate envelope status
+ROW,rule,enforce,condition,trigger_downgrade,
+"requires_downgrade = envelope_in_violation AND risk_epochs >= risk_epochs_to_downgrade",
+string,readonly,Downgrade trigger
+ROW,rule,enforce,condition,trigger_cooldown,
+"requires_cooldown = envelope_in_violation OR cooldown_timer_active",
+string,readonly,Cooldown trigger
+
+SECTION,OUTPUTS
+ROW,output,action,flag,envelope_safe,,bool,readonly,True if no RISK axes
+ROW,output,action,flag,request_capability_downgrade,,bool,readonly,Signal to CapabilityGuard
+ROW,output,action,scalar,next_cooldown_deadline,,timestamp,readonly,End of cooldown window
+
+FOOTER,END-OF-SHARD
