@@ -1,0 +1,61 @@
+{
+  "schema_version": "donutloop.v1",             // required, string
+
+  "row_id": "dl-20260209-000123",              // required, unique string
+  "prev_row_id": "dl-20260209-000122",         // required, string or null for genesis
+
+  "hexstamp": "0xNP0A....",                    // required, hex string of this row hash
+  "prev_hexstamp": "0xNP09....",               // required, hex string ("" for genesis)
+
+  "timestamp_utc": "2026-02-09T12:00:01Z",     // required, RFC3339
+
+  "proposal_id": "ev-20260209-000987",         // required, references .evolve.jsonl
+  "proposal_kind": "RoHUpdate",                // required, enum:
+                                               // ["RoHUpdate","PolicyUpdate",
+                                               //  "CapabilityElevation","CapabilityDowngrade",
+                                               //  "EnvelopeUpdate","MetadataOnly"]
+
+  "module_id": "neurormodule.enforce_alpha",   // required, module name from .neuro-cap.aln
+  "caller_role": "Mentor",                     // required, ALN Role enum name
+  "jurisdiction": "UsFda",                     // required, ALN Jurisdiction enum name
+
+  "roh_before": 0.17,                          // required, float in [0.0, 0.3]
+  "roh_after": 0.19,                           // required, float in [0.0, 0.3]
+
+  "capability_before": "CapLabBench",          // required, CapabilityState enum name
+  "capability_after": "CapControlledHuman",    // required, CapabilityState enum name
+
+  "decision": "Allowed",                       // required, enum:
+                                               // ["Allowed","Denied","RolledBack"]
+  "decision_reason": "DeniedPolicyStackFailure", // required, DecisionReason enum name
+
+  "policy_stack_snapshot": {                   // required, snapshot of PolicyStack
+    "basemedical_ok": true,
+    "baseengineering_ok": true,
+    "jurislocal_ok": true,
+    "quantumaisafety_ok": true
+  },
+
+  "biophysical_source_id": "PhysioNet:CAPSLPDB:slp01a",   // required, non-empty string
+  "regulatory_basis_id": "ISO/IEC 23053:2023:clause-6",   // required, non-empty string
+  "validation_evidence_ref": "evidence/cap_env_v3.md",    // required, non-empty string
+
+  "envelope_shard_ref": "envelopes/sleep-alpha-eda.aln",  // required for EnvelopeUpdate, optional otherwise
+  "roh_model_ref": "rohmodels/cap-sleep-2025.rohmodel.aln", // required for RoHUpdate
+
+  "signatures": {                              // required, multi-sig attestation
+    "host_signature": "b64...",
+    "organic_cpu_signature": "b64...",
+    "regulator_signature": "b64...",           // may be "" if not applicable
+    "hash_algorithm": "SHA2-256",
+    "signature_scheme": "PQCRYSTALS-DILITHIUM5"
+  },
+
+  "bchain_anchor": {                           // optional, Googolswarm / external anchor
+    "chain_id": "Googolswarm-main",
+    "tx_id": "0xabc123...",
+    "anchor_timestamp_utc": "2026-02-09T12:00:05Z"
+  },
+
+  "notes": "Short, human-readable audit note." // optional
+}
