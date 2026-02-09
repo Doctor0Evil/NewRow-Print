@@ -1,0 +1,43 @@
+{
+  "schema_version": "neuro-cap.v1",        // required
+
+  "module_id": "neurormodule.enforce_alpha", // required, unique
+  "description": "EEG alpha/EDA envelope checker; observe-only.",
+
+  "tier": "CapLabBench",                  // required, enum CapabilityState name:
+                                          // ["CapModelOnly","CapLabBench",
+                                          //  "CapControlledHuman","CapGeneralUse"]
+
+  "capabilities": {                       // required, explicit booleans
+    "may_read_historical_shards": true,
+    "may_read_live_signals": true,
+    "may_propose_evolve": true,
+    "may_adjust_envelopes": true,
+    "may_touch_policy_files": false,
+    "may_touch_lifeforce_files": false,
+    "may_actuate": false                  // NewRow-Print! doctrine: typically false. [file:2]
+  },
+
+  "allowed_targets": [                    // required; ALN glob or regex patterns
+    "envelopes/*.aln",
+    "rohmodels/*.aln"
+  ],
+
+  "roh_scope": {                          // required
+    "max_delta_per_proposal": 0.02,       // RoH increase bound
+    "allow_decrease": true
+  },
+
+  "jurisdiction_scopes": [                // required; allowed Jurisdiction tags
+    "GlobalBaseline",
+    "UsFda",
+    "EuMdr"
+  ],
+
+  "never_actuate": true,                  // required, redundant safety bit
+
+  "audit_tags": [                         // optional
+    "neuromorphic-envelope",
+    "sleep-arousal"
+  ]
+}
