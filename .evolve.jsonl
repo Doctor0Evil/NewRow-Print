@@ -1,0 +1,24 @@
+{
+  "epochindex": 12345,
+  "capabilitystate": "CapControlledHuman",
+  "rohscore": 0.21,
+  "treeoflifeview": { "...": "..." },
+  "envelope": { "requiresdowngrade": false, "...": "..." },
+
+  "biotree_tokens": [
+    {
+      "token": "BT:POWER=HI;ROW=POS;NAT=OVR_RECOV",
+      "diag_keys": ["POWER", "ROW", "NAT"],
+      "diag_values": ["HI", "POS", "OVR_RECOV"],
+      "viewonly": true
+    }
+  ],
+
+  "biotree_human_binary": [
+    {
+      "lang": "en-US",
+      "compact": "BT:POWER=HI;ROW=POS;NAT=OVR_RECOV",
+      "text": "brainwatts high, ROW positive, overloaded but recovering"
+    }
+  ]
+}
