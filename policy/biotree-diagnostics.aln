@@ -1,0 +1,28 @@
+SECTION,BIOTREE-META
+ROW,meta,diag,scalar,version,1.0.0,string,nonnull,Version
+ROW,meta,diag,array,inputsources,TREE,ENVELOPE,string,nonnull,Inputs TREE+envelope only
+ROW,meta,diag,flag,viewonly,true,bool,nonwaivable,No policy/control use
+
+SECTION,TOKENS
+ROW,token,diag,enum,key,POWER,string,nonnull,Diagnostic key
+ROW,token,diag,enum,values,LOMIDHI,string,nonnull,Value set
+ROW,token,diag,condition,predicate_POWER_HI,
+  power >= 0.66, string,readonly,TreeOfLifeView.power high band
+
+ROW,token,diag,enum,key,ROW,string,nonnull,ROW index
+ROW,token,diag,enum,values,NEGNEUPOS,string,nonnull,Value set
+ROW,token,diag,condition,predicate_ROW_POS,
+  row_scalar > 0.4, string,readonly,Positive ROW
+
+ROW,token,diag,enum,key,NAT,string,nonnull,Nature/load state
+ROW,token,diag,enum,values,NORMOVROVR_RECOV,string,nonnull,Value set
+ROW,token,diag,condition,predicate_NAT_OVR_RECOV,
+  overloaded == true AND cooldownadvised == true, string,readonly,Overloaded but in recovery
+
+SECTION,SEMANTICS
+ROW,sem,diag,flag,nonpolicy,true,bool,nonwaivable,
+  MUST NOT be used in CapabilityTransitionRequest, ReversalConditions, PolicyStack
+ROW,sem,diag,flag,serialize_to_evolve,true,bool,nonwaivable,
+  Tokens serialized into .evolve.jsonl/.donutloop.aln only
+
+FOOTER,END-OF-SHARD
