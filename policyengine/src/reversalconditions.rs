@@ -1,244 +1,197 @@
-// ReversalConditions kernel for NewRow-Print!
-//
-// Purpose:
-// - Enforce neuromorph evolution monotone by default.
-// - Allow downgrade/reversal ONLY when:
-//   * allow_neuromorph_reversal == true (Tier-1 policy flag),
-//   * NeuromorphSovereign (NEUROMORPH_GOD) quorum is satisfied,
-//   * explicit_reversal_order == true (typed owner/quorum order),
-//   * no_safer_alternative == true (Tier-2 envelopes exhausted all soft mitigations),
-//   * PolicyStack passes, consent is valid, and RoH invariants hold.
-//
-// This module is pure and side-effect free: it does not write logs,
-// mutate capability state, or touch hardware. It only returns a Decision.
-
-use serde::{Deserialize, Serialize};
-
+use crate::alnroles::{RoleSet, can_revert_capability};
 use crate::alncore::{
     CapabilityState,
-    ConsentState,
+    CapabilityTransitionRequest,
     Decision,
     DecisionReason,
-    Jurisdiction,
     PolicyStack,
-    Role,
-    CapabilityTransitionRequest,
 };
+use crate::rohmodel::RoHScore;
+use crate::envelope::EnvelopeContextView;
+use crate::policyreversal::ReversalPolicyFlags;
 
-/// Flags coming from the ALN SECTION,REVERSAL-POLICY shard.
-/// These are already defined at the ALN level; this struct is the Rust mirror.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReversalPolicyFlags {
-    /// Global, non-waivable Tier-1 flag:
-    /// when false, neuromorph evolution downgrades are forbidden in this tier.
-    pub allow_neuromorph_reversal: bool,
-    /// Explicit, typewritten / quorum-signed owner order in .stake.aln / consent ledger.
-    pub explicit_reversal_order: bool,
-    /// Derived by Tier-2 envelopes and Tree-of-Life evidence:
-    /// true only if all non-reversal mitigations (tighten, pause, rest) failed
-    /// and persistent risk / RoH≈0.3 has been observed.
+/// Pure, side-effect-free context for evaluating neuromorph reversals.
+///
+/// This is the minimal state tuple the kernel needs, matching the
+/// ALN SECTION,REVERSAL-POLICY + ROLE/ROLE-COMPOSITION surface and
+/// BiophysicalEnvelopeSpec / RoH model.
+#[derive(Debug, Clone)]
+pub struct ReversalContext<'a> {
+    /// The original capability transition request (from -> to, consent, etc.).
+    pub base: &'a CapabilityTransitionRequest,
+
+    /// Risk-of-Harm score before the proposed transition.
+    pub roh_before: RoHScore,
+    /// Risk-of-Harm score after the proposed transition (counterfactual / predicted).
+    pub roh_after: RoHScore,
+
+    /// Shard-level reversal policy flags frozen in ALN.
+    pub reversal_flags: ReversalPolicyFlags,
+
+    /// Active role set, including Host, OrganicCpuOwner, Regulator, SovereignKernel, etc.
+    pub roles: &'a RoleSet,
+
+    /// Pre-conjoined policy result: BASEMEDICAL ∧ BASEENGINEERING ∧ JURISLOCAL ∧ QUANTUMAISAFETY.
+    pub policystack: &'a PolicyStack,
+
+    /// View over envelope outputs for this subject/session.
+    pub envelope_ctx: &'a EnvelopeContextView,
+
+    /// Conservative boolean derived by biophysical logic + Tree-of-Life evidence.
+    /// True only if all non-reversal mitigations (tighten, pause, rest) have been exhausted.
     pub no_safer_alternative: bool,
 }
 
-/// Minimal view of envelope / Tree-of-Life context needed for ReversalConditions.
-/// This keeps biophysical logic in its own module; here we consume only derived flags.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct EnvelopeContextView {
-    /// True if any active envelope recommends downgrade (requiresdowngrade).
-    pub requires_downgrade: bool,
-    /// True if a requestcapabilitydowngrade output has been formed
-    /// (requires_downgrade && autodowngradeenabled && ownerdowngradeapproved).
-    pub request_capability_downgrade: bool,
-    /// True when neurodimensional balance is within envelopes (no multi-axis RISK, RoH < ceiling).
-    pub balance_maintained: bool,
-}
-
-/// Role set wrapper so we can evaluate NeuromorphSovereign predicates cleanly.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct RoleSet {
-    pub roles: Vec<Role>,
-    /// Number of regulator roles required for quorum.
-    pub required_regulator_quorum: u8,
-}
-
-impl RoleSet {
-    fn has_role(&self, role: Role) -> bool {
-        self.roles.iter().any(|r| *r == role)
-    }
-
-    fn count_role(&self, role: Role) -> u8 {
-        self.roles.iter().filter(|r| **r == role).count() as u8
-    }
-}
-
-/// NeuromorphSovereign / NEUROMORPH_GOD composite:
-/// Host AND OrganicCpuOwner AND SovereignKernel AND regulator quorum.
-pub fn neuromorph_god_satisfied(role_set: &RoleSet) -> bool {
-    let has_host = role_set.has_role(Role::Host);
-    let has_owner = role_set.has_role(Role::OrganicCpuOwner);
-    let has_kernel = role_set.has_role(Role::SovereignKernel);
-    let reg_count = role_set.count_role(Role::Regulator);
-
-    has_host && has_owner && has_kernel && reg_count >= role_set.required_regulator_quorum
-}
-
-/// Helper: is this transition a neuromorph evolution downgrade?
-/// By convention, evolution downgrades are those that reduce CapabilityState
-/// along the main lattice used for human-coupled neuromorph capability.
-fn is_neuromorph_evolution_downgrade(from: CapabilityState, to: CapabilityState) -> bool {
-    // We treat the enum discriminants as ordered from least to most powerful,
-    // consistent with alncore.rs: CapModelOnly < CapLabBench < CapControlledHuman < CapGeneralUse.
-    (to as u8) < (from as u8)
-}
-
-/// Helper: basic consent checks for any live-coupling / downgrade operation.
-fn consent_ok(consent: ConsentState) -> bool {
-    use ConsentState::*;
-    match consent {
-        ConsentState::ConsentRevoked => false,
-        ConsentState::ConsentNone => false,
-        ConsentState::ConsentMinimal | ConsentState::ConsentExtended => true,
-    }
-}
-
-/// Core ReversalConditions evaluation function.
+/// Evaluate a capability transition with respect to neuromorph evolution reversal.
 ///
-/// Inputs:
-/// - base: the original capability transition request (from, to, requester role, consent, PolicyStack, evidence).
-/// - rev_flags: ALN reversal policy flags (allow_neuromorph_reversal, explicit_reversal_order, no_safer_alternative).
-/// - roh_before / roh_after: scalar RoH values before and after the proposed transition.
-/// - envelopectx: biophysical envelope context (requires_downgrade, request_capability_downgrade, balance_maintained).
-/// - role_set: roles involved in the signed downgrade proposal (Host, OrganicCpuOwner, Regulator, SovereignKernel, etc.).
+/// This function is total and side-effect-free:
+/// - It does not perform IO.
+/// - It does not mutate capability, consent, roles, envelopes, or logs.
+/// - It returns a Decision that callers can log into .evolve.jsonl / .donutloop.aln.
 ///
-/// Output:
-/// - Decision { allowed, reason } with explicit, audit-friendly reason codes.
-pub fn evaluate_reversal(
-    base: &CapabilityTransitionRequest,
-    rev_flags: ReversalPolicyFlags,
-    roh_before: f32,
-    roh_after: f32,
-    envelopectx: EnvelopeContextView,
-    role_set: &RoleSet,
-) -> Decision {
-    use CapabilityState::*;
-    use ConsentState::*;
-    use DecisionReason::*;
-
-    // 1. If this is NOT a downgrade, delegate to the normal capability engine.
-    if !is_neuromorph_evolution_downgrade(base.from, base.to) {
-        // For upgrades / same-level or non-evolution downgrades (e.g., bench-only),
-        // keep existing logic in alncore.rs; ReversalConditions is not active here.
-        return base.evaluate();
-    }
-
-    // 2. For neuromorph evolution downgrades, apply high-bar logic.
-
-    // 2.1 PolicyStack must pass.
-    if !base.policy_stack.all_pass() {
-        return Decision::deny(DeniedPolicyStackFailure);
-    }
-
-    // 2.2 Consent must be at least minimal and not revoked.
-    if !consent_ok(base.effective_consent) {
-        return match base.effective_consent {
-            ConsentRevoked => Decision::deny(DeniedConsentRevoked),
-            ConsentNone => Decision::deny(DeniedInsufficientConsent),
-            _ => Decision::deny(DeniedInsufficientConsent),
+/// Invariants enforced:
+/// - MODEL_ONLY / LAB_BENCH research is never blocked.
+/// - RoH is monotone and ≤ 0.30 in CapControlledHuman, except when downgrade reduces RoH.
+/// - Neuromorph evolution downgrades are forbidden by default:
+///   only allowed if allowneuromorphreversal && can_revert_capability && policystack.ok().
+pub fn evaluate_reversal(ctx: &ReversalContext<'_>) -> Decision {
+    // 1. If this is not a downgrade in the neuromorph evolution lattice, allow and delegate
+    //    to the base capability evaluator at a higher layer.
+    if !is_neuromorph_downgrade(ctx.base.from, ctx.base.to) {
+        return Decision {
+            allowed: true,
+            reason: DecisionReason::Allowed,
         };
     }
 
-    // 2.3 RoH invariants: monotone and bounded by ceiling (0.30) in human-coupled tiers.
-    // We assume roh_before/after are already derived from envelope axes with weights summing to 1.0.
-    if roh_after > roh_before {
-        // Downgrade path must not increase RoH.
-        return Decision::deny(DeniedRoHInvariantViolation);
-    }
-    // A stricter check can enforce roh_after <= 0.30 when in CapControlledHuman or above:
-    if matches!(base.from, CapControlledHuman | CapGeneralUse) && roh_after > 0.30 {
-        return Decision::deny(DeniedRoHInvariantViolation);
-    }
+    // 2. RoH monotonicity / ceiling in CapControlledHuman.
+    //
+    // For CapControlledHuman, we enforce:
+    // - roh_after.value <= roh_before.value (no hidden relaxation of biophysical strain), OR
+    //   explicitly documented exception when the downgrade is *reducing* RoH.
+    // - roh_after.value <= 0.30 as the neurorights ceiling.
+    if matches!(ctx.base.from, CapabilityState::CapControlledHuman) {
+        let before = ctx.roh_before.value;
+        let after = ctx.roh_after.value;
 
-    // 2.4 Global Tier-1 reversal flag: if false, evolution downgrades are forbidden in this tier.
-    if !rev_flags.allow_neuromorph_reversal {
-        return Decision::deny(DeniedReversalNotAllowedInTier);
-    }
-
-    // 2.5 Sovereignty: NeuromorphSovereign / NEUROMORPH_GOD composite must be satisfied.
-    if !neuromorph_god_satisfied(role_set) {
-        return Decision::deny(DeniedIllegalDowngradeByNonRegulator);
-    }
-
-    // 2.6 Envelope / microspace: downgrade should be considered only if envelopes truly request it.
-    // This respects the "freedom within microspace-distancing": envelopes can protect,
-    // but ONLY recommend downgrades, never enforce them.
-    if !envelopectx.requires_downgrade {
-        // No strong biophysical recommendation; keep evolution monotone.
-        return Decision::deny(DeniedNoSaferAlternativeNotProved);
-    }
-
-    // Request flag is optional as a stronger signal; if it exists, enforce it.
-    if !envelopectx.request_capability_downgrade {
-        // Biophysical layer has not passed the owner-gated downgrade request condition.
-        return Decision::deny(DeniedNoSaferAlternativeNotProved);
-    }
-
-    // 2.7 Explicit owner/quorum order and biophysical "no safer alternative" proof.
-    if !rev_flags.explicit_reversal_order || !rev_flags.no_safer_alternative {
-        return Decision::deny(DeniedNoSaferAlternativeNotProved);
-    }
-
-    // 2.8 Final check: jurisdiction identifier may further restrict reversals in some regions.
-    // This is a hook for JURISLOCAL / QUANTUMAISAFETY extensions; here we treat it as a no-op
-    // except for placeholder audit reasons when future rules are added.
-    match base.jurisdiction {
-        Jurisdiction::GlobalBaseline
-        | Jurisdiction::UsFda
-        | Jurisdiction::EuMdr
-        | Jurisdiction::LocalCustom => {
-            // No extra denial here; jurisdictional predicates are encoded in PolicyStack.
+        // If downgrade would *increase* RoH or exceed the ceiling, deny.
+        if (after > before) && !reduces_capability_and_roh(ctx) {
+            return Decision {
+                allowed: false,
+                reason: DecisionReason::DeniedRoHViolation,
+            };
+        }
+        if after > 0.30 {
+            return Decision {
+                allowed: false,
+                reason: DecisionReason::DeniedRoHViolation,
+            };
         }
     }
 
-    // If all checks pass, we allow the neuromorph evolution downgrade as
-    // a last-resort, owner-quorum, biophysically justified action.
-    Decision::allow()
+    // 3. Deny neuromorph evolution downgrades by default at Tier-1:
+    //    allowneuromorphreversal is a non-waivable false unless explicitly flipped in ALN.
+    if !ctx.reversal_flags.allow_neuromorph_reversal {
+        return Decision {
+            allowed: false,
+            reason: DecisionReason::DeniedReversalNotAllowedInTier,
+        };
+    }
+
+    // 4. Sovereignty gate:
+    //    Neuromorph evolution reversal is allowed only when the composite
+    //    NEUROMORPH-GOD / NeuromorphSovereign predicate holds AND the shard-level
+    //    canrevertcapability condition is satisfied.
+    //
+    // can_revert_capability encodes:
+    // neuromorphgodsatisfied(roles, quorum) ∧ explicitreversalorder ∧ nosaferalternative
+    let required_reg_quorum = ctx.reversal_flags.required_regulator_quorum();
+
+    let can_revert = can_revert_capability(
+        ctx.roles,
+        required_reg_quorum,
+        ctx.reversal_flags.explicit_reversal_order,
+        ctx.no_safer_alternative,
+    );
+
+    if !can_revert {
+        // Distinguish sovereignty vs. no-safer-alternative where possible.
+        if !ctx.roles.neuromorph_god_satisfied(required_reg_quorum) {
+            return Decision {
+                allowed: false,
+                reason: DecisionReason::DeniedIllegalDowngradeByNonRegulator,
+            };
+        }
+        if !ctx.reversal_flags.explicit_reversal_order || !ctx.no_safer_alternative {
+            return Decision {
+                allowed: false,
+                reason: DecisionReason::DeniedNoSaferAlternativeNotProved,
+            };
+        }
+        // Fallback: generic consent / roles failure.
+        return Decision {
+            allowed: false,
+            reason: DecisionReason::DeniedConsentOrRoles,
+        };
+    }
+
+    // 5. PolicyStack gate:
+    //    BASEMEDICAL ∧ BASEENGINEERING ∧ JURISLOCAL ∧ QUANTUMAISAFETY must all pass.
+    if !ctx.policystack.all_pass() {
+        return Decision {
+            allowed: false,
+            reason: DecisionReason::DeniedPolicyStackFailure,
+        };
+    }
+
+    // 6. Envelope advisory context:
+    //
+    // EnvelopeContextView and Tree-of-Life diagnostics may mark
+    // requires_downgrade / request_capability_downgrade, but they remain advisory
+    // controllers. We *do not* allow them to bypass sovereignty or policy checks.
+    //
+    // Here we assert only that, if a downgrade is being granted, the envelope
+    // context at least indicates that a downgrade is consistent with its own
+    // recommendation; otherwise we deny as an illegal downgrade.
+    if !ctx.envelope_ctx.request_capability_downgrade {
+        return Decision {
+            allowed: false,
+            reason: DecisionReason::DeniedIllegalDowngradeByNonRegulator,
+        };
+    }
+
+    // If all guards pass, this downgrade is allowed as a last-resort, sovereign, policy-checked
+    // neuromorph evolution reversal, to be logged and attested in .evolve.jsonl / .donutloop.aln.
+    Decision {
+        allowed: true,
+        reason: DecisionReason::Allowed,
+    }
 }
 
-// --------- Extended DecisionReason integration ---------
-//
-// NOTE: The core DecisionReason enum is defined in alncore.rs.
-// It must be extended there with the following variants:
-//
-//   DeniedReversalNotAllowedInTier,
-//   DeniedRoHInvariantViolation,
-//   DeniedNoSaferAlternativeNotProved,
-//   DeniedIllegalDowngradeByNonRegulator
-//
-// This module assumes those variants exist and uses them for explicit auditability.
-//
-// Example extension (to be placed in alncore.rs):
-//
-// #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-// pub enum DecisionReason {
-//     Allowed,
-//     DeniedInsufficientConsent,
-//     DeniedConsentRevoked,
-//     DeniedPolicyStackFailure,
-//     DeniedMissingEvidence,
-//     DeniedIllegalDowngradeByNonRegulator,
-//     DeniedReversalNotAllowedInTier,
-//     DeniedRoHInvariantViolation,
-//     DeniedNoSaferAlternativeNotProved,
-//     DeniedUnknown,
-// }
-//
-// impl Decision {
-//     pub fn allow() -> Self {
-//         Decision { allowed: true, reason: DecisionReason::Allowed }
-//     }
-//
-//     pub fn deny(reason: DecisionReason) -> Self {
-//         Decision { allowed: false, reason }
-//     }
-// }
-// -------------------------------------------------------
+/// Helper: determine whether a transition is a neuromorph evolution downgrade
+/// in the capability lattice. This is intentionally narrow: only downgrades
+/// that reduce neuromorph evolution rights are treated as "high-stakes".
+fn is_neuromorph_downgrade(from: CapabilityState, to: CapabilityState) -> bool {
+    use CapabilityState::*;
+
+    matches!(
+        (from, to),
+        (CapControlledHuman, CapLabBench)
+            | (CapControlledHuman, CapModelOnly)
+            | (CapGeneralUse, CapControlledHuman)
+            | (CapGeneralUse, CapLabBench)
+            | (CapGeneralUse, CapModelOnly)
+    )
+}
+
+/// Helper: true when this downgrade reduces both capability tier and RoH,
+/// allowing an exception to strict RoH monotonicity for safety-increasing
+/// reversals. This keeps RoH "safe-first" while permitting emergency rollback.
+fn reduces_capability_and_roh(ctx: &ReversalContext<'_>) -> bool {
+    let from = ctx.base.from;
+    let to = ctx.base.to;
+    let before = ctx.roh_before.value;
+    let after = ctx.roh_after.value;
+
+    is_neuromorph_downgrade(from, to) && (after < before)
+}
