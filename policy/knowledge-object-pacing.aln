@@ -1,0 +1,124 @@
+SECTION,KNOWLEDGE-OBJECT-PACING
+  id knowledge-object-pacing-v1
+
+  FIELD roh_ceiling_f32 = 0.30
+
+  FIELD applies_to = NATURE_TOKEN, METABOLIC_DOCTRINE, ROW_DIAGNOSTIC
+
+  FIELD cap_tier::model_only_max_per_hour_f32       = 9999.0
+  FIELD cap_tier::lab_bench_max_per_hour_f32        = 50.0
+  FIELD cap_tier::controlled_human_max_per_hour_f32 = 3.0
+
+  FIELD user_goal::safer_pacing_no_downgrade = "safer-pacing-no-downgrade"
+  FIELD user_goal::slower_object_creation    = "slower-object-creation"
+
+  FIELD balance::window_secs_u32        = 900
+  FIELD balance::min_fraction_safe_f32  = 0.90
+ENDSECTION
+
+RULE,NEURODIMENSIONAL-BALANCE-MAINTAINED
+  WHEN CapabilityState == CapControlledHuman
+  THEN
+    REQUIRE rohscore.value_f32 <= KNOWLEDGE-OBJECT-PACING.roh_ceiling_f32
+
+    LET fraction_safe =
+      envelope::multimodal_fraction_safe(
+        window_secs    = KNOWLEDGE-OBJECT-PACING.balance::window_secs_u32,
+        require_eeg    = true,
+        require_hrv    = true,
+        require_eda    = true,
+        require_resp   = true,
+        require_gaze   = true,
+        require_motion = true)
+
+    REQUIRE fraction_safe >=
+      KNOWLEDGE-OBJECT-PACING.balance::min_fraction_safe_f32
+  END
+ENDRULE
+
+RULE,LEARNING-RATE-TIER-BUDGET
+  LET current_cap = CapabilityState
+
+  LET promotions_in_hour =
+    count(.evolve.jsonl where
+      knowledge_object.promoted == true
+      AND knowledge_object.scope == diagnostic-only
+      AND timestamp within last 3600)
+
+  WHEN current_cap == CapModelOnly
+  THEN
+    REQUIRE promotions_in_hour <=
+      KNOWLEDGE-OBJECT-PACING.cap_tier::model_only_max_per_hour_f32
+  END
+
+  WHEN current_cap == CapLabBench
+  THEN
+    REQUIRE promotions_in_hour <=
+      KNOWLEDGE-OBJECT-PACING.cap_tier::lab_bench_max_per_hour_f32
+  END
+
+  WHEN current_cap == CapControlledHuman
+  THEN
+    REQUIRE promotions_in_hour <=
+      KNOWLEDGE-OBJECT-PACING.cap_tier::controlled_human_max_per_hour_f32
+  END
+ENDRULE
+
+RULE,USER-PACING-GOAL-FLAG
+  WHEN GOAL.intent ==
+         KNOWLEDGE-OBJECT-PACING.user_goal::safer_pacing_no_downgrade
+    OR GOAL.intent ==
+         KNOWLEDGE-OBJECT-PACING.user_goal::slower_object_creation
+  THEN
+    SET pacing::user_requested_safer_pacing_bool = true
+
+    LOG "user-requested-safer-pacing"
+      INTO ".evolve.jsonl"
+      WITH reason_code = "user_goal_safer_pacing_no_downgrade"
+  END
+ENDRULE
+
+RULE,DYNAMIC-PACING-THROTTLE
+  LET current_cap = CapabilityState
+
+  LET promotions_in_hour =
+    count(.evolve.jsonl where
+      knowledge_object.promoted == true
+      AND knowledge_object.scope == diagnostic-only
+      AND timestamp within last 3600)
+
+  WHEN pacing::user_requested_safer_pacing_bool == true
+   AND current_cap == CapControlledHuman
+  THEN
+    REQUIRE promotions_in_hour <= 1.0
+  END
+ENDRULE
+
+RULE,NO-DOWNGRADE-FROM-PACING
+  WHEN pacing::user_requested_safer_pacing_bool == true
+  THEN
+    FORBID CapabilityTransitionRequest
+      WHERE requested_transition.kind   == "DOWNGRADE"
+        AND requested_transition.reason == "pacing_policy_only"
+  END
+ENDRULE
+
+RULE,PACING-DECISION-LOG
+  WHEN knowledge_object.promotion_attempt == true
+  THEN
+    LET reason =
+      CASE
+        WHEN budget_exceeded_bool                == true
+          THEN "pacing_budget_reached"
+        WHEN fairness_pending_bool               == true
+          THEN "pending_fairness_review"
+        WHEN neurodimensional_balance_failed_bool== true
+          THEN "neurodimensional_balance_not_maintained"
+        ELSE "promotion_allowed"
+      END
+
+    LOG "knowledge-object-pacing-decision"
+      INTO ".evolve.jsonl"
+      WITH reason_code = reason
+  END
+ENDRULE
