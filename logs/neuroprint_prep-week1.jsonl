@@ -1,0 +1,26 @@
+{
+  "timestamp_ms": 1739145600000,
+  "subject_id": "self-bostrom",
+  "day_index": 1,
+  "session_label": "evening-reflection",
+  "biotree": {
+    "bloodlevel": "high",
+    "oxygenlevel": "medium",
+    "decaylevel": "rising",
+    "lifeforcelevel": "medium",
+    "fearlevel": "low",
+    "painlevel": "low",
+    "notes": "HR a bit fast, slept ok, not much pain."
+  },
+  "nature": {
+    "label_main": "overloaded-but-recovering",
+    "label_secondary": ["not-crisis"],
+    "confidence_self": 0.7,
+    "notes": "Mind busy, but I feel like I can calm down with a break."
+  },
+  "goal": {
+    "intent": "safer-pacing-no-downgrade",
+    "asks": ["more-explanation", "suggest-cooldown-ideas", "keep-capability-unchanged"],
+    "notes": "Want support for focus and rest, without changing my rights."
+  }
+}
