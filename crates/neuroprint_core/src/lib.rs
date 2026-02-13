@@ -36,3 +36,52 @@ pub struct NeuroPrintView {
     /// Optional advisory labels (e.g., NATURE tokens as strings).
     pub labels: Vec<String>,
 }
+/// Pure, non-actuating projection from governed state to NeuroPrintView.
+pub fn neuroprint_from_snapshot(input: &NeuroPrintInput) -> NeuroPrintView {
+    // Internal helpers use only envelope + RoH + capability, never mutate them.
+    let blood = clamp01(map_blood(&input.envelope));
+    let oxygen = clamp01(map_oxygen(&input.envelope));
+    let wave = clamp01(map_wave(&input.envelope));
+    let time = clamp01(map_time(&input.envelope));
+
+    // RoH-based assets; RoHProjection enforces roh_after <= roh_ceiling <= 0.3.
+    let roh_norm = clamp01(input.roh.after / input.roh.ceiling);
+    let decay = roh_norm;
+    let lifeforce = 1.0 - roh_norm;
+
+    let brain = clamp01(map_brain(&input.capability_state));
+    let smart = clamp01(map_smart(&input.capability_state));
+    let evolve = clamp01(map_evolve(&input.capability_state, input.evolve_index));
+    let power = clamp01(map_power(&input.envelope));
+    let tech = clamp01(map_tech(&input.envelope));
+    let fear = clamp01(map_fear(&input.envelope));
+    let pain = clamp01(map_pain(&input.envelope));
+    let nano = clamp01(map_nano(input.evolve_index));
+
+    let labels = Vec::new(); // NATURE labels can be attached by a separate module.
+
+    NeuroPrintView {
+        blood,
+        oxygen,
+        wave,
+        time,
+        decay,
+        lifeforce,
+        brain,
+        smart,
+        evolve,
+        power,
+        tech,
+        fear,
+        pain,
+        nano,
+        labels,
+    }
+}
+
+#[macro_export]
+macro_rules! neuroprint {
+    ($input:expr) => {
+        $crate::neuroprint_from_snapshot(&$input)
+    };
+}
