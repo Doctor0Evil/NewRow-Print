@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://newrow-print.org/schema/fairness-unfair_drain.schema.json",
+  "title": "UNFAIRDRAIN Diagnostics Log Row",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "timestamp_ms": {
+      "type": "integer",
+      "description": "Unix timestamp in milliseconds when the flag was computed."
+    },
+    "subject_id": {
+      "type": "string",
+      "description": "Stable pseudonymous identifier for the subject."
+    },
+    "session_id": {
+      "type": "string",
+      "description": "Optional session or run identifier.",
+      "nullable": true
+    },
+    "capability_tier": {
+      "type": "string",
+      "enum": ["ModelOnly", "LabBench", "ControlledHuman", "GeneralUse"],
+      "description": "Capability tier at the time of evaluation."
+    },
+    "role": {
+      "type": "string",
+      "enum": ["Teacher", "Learner", "Mentor", "Operator", "Other"],
+      "description": "High-level role tag, advisory only."
+    },
+    "jurisdiction_tag": {
+      "type": "string",
+      "description": "Jurisdiction/policy context tag, e.g., US_FDA, EU_MDR, GLOBAL_BASE."
+    },
+    "task_tag": {
+      "type": "string",
+      "description": "High-level task/domain tag used for peer grouping."
+    },
+    "unfair_drain": {
+      "type": "boolean",
+      "description": "True if the UNFAIRDRAIN predicate is satisfied at this time."
+    },
+    "budget": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Subject's window-averaged budget B_s(t), e.g., 0.5*(LIFEFORCE_W + OXYGEN_W)."
+    },
+    "peer_median_budget": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Median budget of peers in the Comparable(s, s', t) group."
+    },
+    "overload_fraction": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Fraction of epochs in OVERLOADED within the sliding window."
+    },
+    "window_ms": {
+      "type": "integer",
+      "description": "Sliding-window length used for this evaluation (copied from config)."
+    },
+    "delta_unfair": {
+      "type": "number",
+      "description": "Budget deficit threshold used (copied from config)."
+    },
+    "overload_frac_min": {
+      "type": "number",
+      "description": "Overload fraction threshold used (copied from config)."
+    },
+    "config_version": {
+      "type": "string",
+      "description": "Version string of the UNFAIRDRAIN config shard that produced this evaluation."
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional human-readable notes or explanation.",
+      "nullable": true
+    }
+  },
+  "required": [
+    "timestamp_ms",
+    "subject_id",
+    "capability_tier",
+    "role",
+    "jurisdiction_tag",
+    "task_tag",
+    "unfair_drain",
+    "budget",
+    "peer_median_budget",
+    "overload_fraction",
+    "window_ms",
+    "delta_unfair",
+    "overload_frac_min",
+    "config_version"
+  ]
+}
