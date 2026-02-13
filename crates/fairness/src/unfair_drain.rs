@@ -75,3 +75,126 @@ pub struct UnfairDrainFlag {
     pub peer_median_budget: f32,
     pub overload_fraction: f32,
 }
+
+fn comparable(a: &SubjectSnapshot, b: &SubjectSnapshot) -> bool {
+    // Same capability tier.
+    if a.capability_tier != b.capability_tier {
+        return false;
+    }
+
+    // Same jurisdiction/policy context tag.
+    if a.policy_view.jurisdiction_tag != b.policy_view.jurisdiction_tag {
+        return false;
+    }
+
+    // Same high-level task tag (e.g., "lesson_01").
+    if a.task_tag != b.task_tag {
+        return false;
+    }
+
+    true
+}
+
+/// Compute advisory UNFAIRDRAIN flags over a set of SubjectSnapshot records.
+/// Pure function: no I/O, no capability or policy mutations.
+/// Intended usage: log post-processing or simulation diagnostics.
+pub fn compute_unfair_drain(
+    cfg: &UnfairDrainConfig,
+    snapshots: &[SubjectSnapshot],
+) -> Vec<UnfairDrainFlag> {
+    // Group snapshots by subject_id for sliding-window analysis.
+    let mut by_subject: HashMap<String, Vec<&SubjectSnapshot>> = HashMap::new();
+    for snap in snapshots {
+        by_subject
+            .entry(snap.subject_id.clone())
+            .or_default()
+            .push(snap);
+    }
+
+    let mut flags = Vec::new();
+
+    for (subject_id, mut series) in by_subject {
+        // Sort by time within subject.
+        series.sort_by_key(|s| s.t_ms);
+
+        // For each snapshot in this subject's series, compute window-based metrics.
+        for (idx, &snap) in series.iter().enumerate() {
+            let t_center = snap.t_ms;
+            let t_start = t_center - cfg.window_ms;
+
+            // 1. Collect this subject's window frames.
+            let mut self_count = 0usize;
+            let mut self_overload_count = 0usize;
+            let mut self_budget_sum = 0f32;
+
+            for &s in series.iter() {
+                if s.t_ms >= t_start && s.t_ms <= t_center {
+                    self_count += 1;
+                    self_budget_sum += 0.5 * (s.lifeforce + s.oxygen);
+                    if s.overloaded {
+                        self_overload_count += 1;
+                    }
+                }
+            }
+
+            if self_count == 0 {
+                continue;
+            }
+
+            let self_budget_avg = self_budget_sum / self_count as f32;
+            let self_overload_frac = self_overload_count as f32 / self_count as f32;
+
+            // 2. Build peer group at this time across all subjects.
+            let mut peer_budgets: Vec<f32> = Vec::new();
+
+            for other in snapshots {
+                // Time window for peer is aligned to t_center; same window width for simplicity.
+                if other.t_ms >= t_start && other.t_ms <= t_center {
+                    if comparable(snap, other) {
+                        let b = 0.5 * (other.lifeforce + other.oxygen);
+                        peer_budgets.push(b);
+                    }
+                }
+            }
+
+            if peer_budgets.is_empty() {
+                // No peers: cannot assess unfairness; default to no unfair drain.
+                flags.push(UnfairDrainFlag {
+                    subject_id: subject_id.clone(),
+                    t_ms: t_center,
+                    unfair_drain: false,
+                    budget: self_budget_avg,
+                    peer_median_budget: self_budget_avg,
+                    overload_fraction: self_overload_frac,
+                });
+                continue;
+            }
+
+            peer_budgets.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+            let mid = peer_budgets.len() / 2;
+            let peer_median = if peer_budgets.len() % 2 == 0 {
+                0.5 * (peer_budgets[mid - 1] + peer_budgets[mid])
+            } else {
+                peer_budgets[mid]
+            };
+
+            // 3. Apply UNFAIRDRAIN predicate:
+            //     B_s(t) <= Med_G(t) - delta_unfair
+            //  AND overload_frac_s(t) >= overload_frac_min
+            let budget_deficit = peer_median - self_budget_avg;
+            let unfair = budget_deficit >= cfg.delta_unfair
+                && self_overload_frac >= cfg.overload_frac_min;
+
+            flags.push(UnfairDrainFlag {
+                subject_id: subject_id.clone(),
+                t_ms: t_center,
+                unfair_drain: unfair,
+                budget: self_budget_avg,
+                peer_median_budget: peer_median,
+                overload_fraction: self_overload_frac,
+            });
+        }
+    }
+
+    flags
+}
