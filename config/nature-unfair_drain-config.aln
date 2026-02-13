@@ -1,0 +1,22 @@
+SECTION,UNFAIR_DRAIN_CONFIG
+ROW,field,version,string,UNFAIR_DRAIN_CONFIG_V1
+ROW,field,enabled,bool,true
+
+# Sliding window length in milliseconds (e.g., last 10 minutes).
+ROW,field,window_ms,i64,600000
+
+# Budget deficit threshold: Med(peer_budget) - B_s(t) >= delta_unfair.
+# Budgets and thresholds are in normalized 0.0–1.0 space.
+ROW,field,delta_unfair,f32,0.10
+
+# Minimum fraction of epochs in OVERLOADED within [t - window_ms, t].
+ROW,field,overload_frac_min,f32,0.30
+
+# Optional: minimum peer group size to evaluate UNFAIRDRAIN.
+ROW,field,min_peer_group_size,u32,3
+
+# Optional: cap on number of flags per subject per hour (rate limiting for logs).
+ROW,field,max_flags_per_hour,u32,60
+
+ROW,field,notes,string,"UNFAIRDRAIN is a read-only fairness diagnostic over TreeOfLifeView histories. It MUST NOT be used as an input to CapabilityTransitionRequest, ReversalConditions, or any actuation logic."
+FOOTER,END-SECTION
