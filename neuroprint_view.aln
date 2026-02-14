@@ -1,0 +1,50 @@
+SECTION,NEUROPRINT-VIEW
+
+ROW,doc,NeuroPrint! TREE+NATURE view over governed state.
+ROW,role,PATTERN-I,readonly-analytics-agent
+
+ROW,field,timestampms,u64,nonnull
+ROW,field,subjectid,string,nonnull
+ROW,field,epochindex,u64,nonnull
+ROW,field,capabilitystate,string,nonnull
+
+; Core TREE assets (0.0–1.0, pure projections)
+ROW,field,blood,f32,0.0-1.0
+ROW,field,oxygen,f32,0.0-1.0
+ROW,field,wave,f32,0.0-1.0
+ROW,field,h2o,f32,0.0-1.0
+ROW,field,time,f32,0.0-1.0
+ROW,field,decay,f32,0.0-1.0
+ROW,field,lifeforce,f32,0.0-1.0
+ROW,field,brain,f32,0.0-1.0
+ROW,field,smart,f32,0.0-1.0
+ROW,field,evolve,f32,0.0-1.0
+ROW,field,power,f32,0.0-1.0
+ROW,field,tech,f32,0.0-1.0
+ROW,field,fear,f32,0.0-1.0
+ROW,field,pain,f32,0.0-1.0
+ROW,field,nano,f32,0.0-1.0
+
+; 1D biofield geometry (extra TREE-aligned rails)
+ROW,field,bio_coord_1d,f32,0.0-1.0
+ROW,field,biofield_load,f32,0.0-1.0
+
+; Optional advisory NATURE labels (CALM_STABLE, OVERLOADED, etc.)
+ROW,field,naturelabels,jsonarray,string,optional
+
+; Optional qualitative BIOTREE/NATURE/GOAL logs (observe-only)
+ROW,field,biotreelog,jsonobject,optional
+ROW,field,naturelog,jsonobject,optional
+ROW,field,goallog,jsonobject,optional
+
+ROW,invariant,NON-ACTUATION,
+  "NEUROPRINT-VIEW is a pure projection. It MUST NOT mutate or propose
+   changes to CapabilityState, ConsentState, BiophysicalEnvelopeSpec,
+   RoH models, ReversalConditions, PolicyStack, or any hardware driver."
+
+ROW,invariant,LOG-ONLY,
+  "NEUROPRINT-VIEW records MAY be appended into .evolve.jsonl and
+   hash-linked via .donutloop.aln. Standalone writable ledgers for
+   neuroprint! are forbidden."
+
+FOOTER,END-SECTION
