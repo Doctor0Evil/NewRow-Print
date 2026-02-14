@@ -1,0 +1,66 @@
+SECTION,META
+ROW,meta,taint,scalar,version,1.0.0,string,nonnull,Taint spec version
+ROW,meta,taint,scalar,scope,NewRowPrint.organicallyintegratedaugmentedcitizen,string,nonnull,Environment
+ROW,meta,taint,flag,nonwaivable,true,bool,nonwaivable,Cannot be relaxed at runtime
+
+SECTION,CRITICAL-TYPES
+# Fully-qualified type names that carry policy-critical state.
+ROW,type,critical,scalar,name,crate::alncore::CapabilityState,string,primarykey,Capability lattice
+ROW,type,critical,scalar,name,crate::alncore::CapabilityTransitionRequest,string,primarykey,Transition proposals
+ROW,type,critical,scalar,name,crate::alncore::Decision,string,primarykey,Allow/Deny
+ROW,type,critical,scalar,name,crate::alncore::DecisionReason,string,primarykey,Denial reasons
+ROW,type,critical,scalar,name,crate::alncore::PolicyStack,string,primarykey,Composite BASEMEDICAL/ENGINEERING/JURISLOCAL/QUANTUMAISAFETY
+ROW,type,critical,scalar,name,crate::alnroles::RoleSet,string,primarykey,Sovereignty roles, multisig
+ROW,type,critical,scalar,name,crate::policy::reversal::ReversalPolicyFlags,string,primarykey,allowneuromorphreversal/explicitreversalorder/nosaferalternative
+ROW,type,critical,scalar,name,crate::policyengine::reversalconditions::ReversalContext,string,primarykey,Minimal downgrade context
+ROW,type,critical,scalar,name,crate::rohmodel::RoHScore,string,primarykey,RoH scalar under 0.30
+
+SECTION,TRUSTED-WRITERS
+# Only these modules/functions may construct or mutate critical types.
+ROW,writer,allowed,scalar,path,crate::policyengine::reversalconditions::evaluate_reversal,string,nonnull,ReversalConditions kernel
+ROW,writer,allowed,scalar,path,crate::alncore::CapabilityTransitionRequest::evaluate,string,nonnull,Core state machine
+ROW,writer,allowed,scalar,path,crate::policyengine::capability_guard::apply_transition,string,nonnull,CapabilityGuard executor
+ROW,writer,allowed,scalar,path,crate::sovereign_audit::record_decision,string,nonnull,Ledger writer only
+
+SECTION,TRUSTED-READERS
+# Read-only consumers (may not construct/mutate).
+ROW,reader,allowed,scalar,path,crate::envelope::*,string,nonnull,Biophysical envelopes Tier-2
+ROW,reader,allowed,scalar,path,crate::treeoflife::*,string,nonnull,Tree-of-Life diagnostics Tier-2
+ROW,reader,allowed,scalar,path,crate::autochurch::*,string,nonnull,AutoChurch diagnostics Tier-2
+ROW,reader,allowed,scalar,path,crate::neuroprint::*,string,nonnull,Neuroprint! BIOTREE/NATURE diagnostics
+
+SECTION,DISALLOWED-PATTERNS
+# Patterns that must NEVER touch critical types.
+ROW,ban,pattern,scalar,kind,UnsafeFn,string,nonnull,Any unsafe fn taking or returning critical types
+ROW,ban,pattern,scalar,kind,RawPtr,string,nonnull,*const/*mut to critical types
+ROW,ban,pattern,scalar,kind,FFIWrite,string,nonnull,extern \"C\" fns that construct or mutate critical types
+ROW,ban,pattern,scalar,kind,DynTraitCritical,string,nonnull,dyn Trait object whose vtable methods take &mut critical types
+ROW,ban,pattern,scalar,kind,GlobalMutable,string,nonnull,static mut that contains or aliases critical types
+
+SECTION,FFI-BOUNDARY
+ROW,ffi,rule,scalar,entrypoint,crate::ffi::*,string,nonnull,All FFI modules
+ROW,ffi,rule,flag,may_construct_context,false,bool,nonwaivable,FFI cannot construct ReversalContext
+ROW,ffi,rule,flag,may_mutate_state,false,bool,nonwaivable,FFI cannot mutate CapabilityState/Decision
+ROW,ffi,rule,flag,may_propose_request,true,bool,nonwaivable,FFI may only populate plain CapabilityTransitionRequestData
+
+SECTION,DIAGNOSTIC-EVIDENCE
+# Tainted sources that must stay advisory.
+ROW,diag,source,scalar,name,crate::treeoflife::TreeOfLifeView,string,nonnull,BIOTREE/TREE assets
+ROW,diag,source,scalar,name,crate::treeoflife::TreeOfLifeDiagnostics,string,nonnull,Diagnostic labels and flags
+ROW,diag,source,scalar,name,crate::neuroprint::NeuroprintView,string,nonnull,BIOTREE/NATURE/GOAL
+ROW,diag,source,scalar,name,crate::autochurch::AutoChurchDiagnostics,string,nonnull,CHURCH/POWER/TECH, archetypes
+ROW,diag,source,scalar,name,crate::envelope::EnvelopeContextView,string,nonnull,Biophysical envelope outputs
+
+# Single audited join point into downgrade logic.
+ROW,diag,joinpoint,scalar,name,crate::policy::reversal::compute_no_safer_alternative,string,nonnull,Only function allowed to map diagnostics -> nosaferalternative
+ROW,diag,joinpoint,flag,may_set_flag,true,bool,nonwaivable,May set nosaferalternative in ReversalPolicyFlags
+ROW,diag,joinpoint,flag,may_write_state,false,bool,nonwaivable,Must not mutate CapabilityState/Decision
+
+SECTION,ANNOTATION-MAP
+# How Rust attributes should be generated from this shard.
+ROW,attr,map,scalar,critical_type_attr,nr_taint_critical,string,nonnull,Marks a struct/enum as policy-critical
+ROW,attr,map,scalar,trusted_writer_attr,nr_taint_trusted_writer,string,nonnull,Marks a function as allowed writer
+ROW,attr,map,scalar,trusted_reader_attr,nr_taint_trusted_reader,string,nonnull,Marks a module as read-only consumer
+ROW,attr,map,scalar,diag_join_attr,nr_taint_diag_join,string,nonnull,Marks compute_no_safer_alternative join point
+
+FOOTER,END-OF-SHARD
