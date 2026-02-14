@@ -1,0 +1,35 @@
+SECTION,NEURO-DNA-ELIGIBILITY-META
+ROW,meta,schema,scalar,schemaid,neuro-dna-eligibility-v1,string,primarykey
+ROW,meta,schema,scalar,version,1.0.0,string,nonnull
+ROW,meta,schema,array,juristags,
+    CHILE-NEURORIGHTS-2023,EU-AI-ACT-NEURO,UNESCO-NEURO-ETHICS-2024,OECD-NEUROTECH,
+    string,nonnull
+ROW,meta,schema,scalar,role,GUARD-SHARD,string,nonnull
+ROW,meta,schema,scalar,actuation,NOACTUATION,string,nonnull
+
+SECTION,NEURO-DNA-ELIGIBILITY-KEYS
+ROW,key,subject,scalar,subjectid,,string,primarykey
+ROW,key,subject,scalar,eligibility_id,,string,nonnull
+ROW,key,subject,scalar,timestamputc,,timestamp,nonnull
+ROW,key,subject,scalar,valid_until,,timestamp,nonnull
+
+SECTION,NEURO-DNA-ELIGIBILITY-STATE
+ROW,state,core,scalar,dna_eligible,,bool,readonly
+ROW,state,core,scalar,eligibility_signature,,string,readonly
+ROW,state,core,scalar,source_registry,,string,readonly
+ROW,state,core,scalar,roh_cap,0.30,float,readonly
+ROW,state,core,scalar,max_validation_window_secs,1020,int,readonly
+
+SECTION,NEURO-DNA-ELIGIBILITY-INVARIANTS
+ROW,inv,scope,condition,validwindow,
+    valid_until - timestamputc <= max_validation_window_secs,string,readonly
+ROW,inv,nonactuation,condition,nocapabilitywrite,
+    NEURO-DNA-ELIGIBILITY MUST NOT write CapabilityState,string,readonly
+ROW,inv,nonactuation,condition,noenvelopewrite,
+    NEURO-DNA-ELIGIBILITY MUST NOT write BiophysicalEnvelopeSpec,string,readonly
+ROW,inv,nonactuation,condition,noreversalwrite,
+    NEURO-DNA-ELIGIBILITY MUST NOT write ReversalFlags or PolicyStack,string,readonly
+ROW,inv,nonactuation,condition,notreewrite,
+    NEURO-DNA-ELIGIBILITY MUST NOT write Tree-of-Life or NATURE fields,string,readonly
+
+FOOTER,END-SECTION
