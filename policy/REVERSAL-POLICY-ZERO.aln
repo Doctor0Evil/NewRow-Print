@@ -1,0 +1,74 @@
+SECTION,REVERSAL-POLICY-ZERO
+
+ROW,doc,Zero-reversal doctrine for organicallyintegratedaugmentedcitizen.
+ROW,role,POLICY,NON-NEGOTIABLE
+
+; 1. Hard prohibition: no neuromorph reversals for this subject / role.
+
+ROW,field,allowneuromorphreversal,bool,false
+ROW,field,zeroreversal_enabled,bool,true
+
+ROW,invariant,ZERO-REVERSAL,
+  "When zeroreversal_enabled = true, neuromorph evolution MUST be monotone.
+   No downgrade, de-evolution, or capability tier reduction is permitted
+   under any circumstance in CapControlledHuman modes for this subject /
+   profile. ReversalConditions MUST always return DeniedZeroReversalDoctrine."
+
+; 2. Consent and neurorights protection.
+
+ROW,invariant,CONSENT-PROTECTION,
+  "No combination of explicitreversalorder, stake quorum, or policy edits
+   may override ZERO-REVERSAL for this profile. Any attempt to authorize
+   downgrade MUST be rejected and WORM-logged as a violation attempt, not
+   executed as a change in CapabilityState."
+
+; 3. Mandatory learning on every reversal *concept*.
+
+ROW,field,log_reversal_attempts,bool,true
+
+ROW,invariant,LEARNING-ON-ATTEMPT,
+  "Every time a CapabilityTransitionRequest of type 'DOWNGRADE' or any
+   ReversalConditions call is evaluated for this subject, the kernel MUST:
+   (1) return DeniedZeroReversalDoctrine,
+   (2) emit a ReversalAttemptLog entry into .evolve.jsonl with:
+       - timestampms
+       - subjectid
+       - requested_capability_from/to
+       - roh_before, roh_after
+       - decay, lifeforce
+       - envelope_WARN/RISK history window
+       - counts of cooldown/pause/tighten episodes
+       - active NATURE predicates (OVERLOADED, UNFAIRDRAIN, RECOVERY)
+       - biotree/nature/goal logs if present
+       - decision_reason = 'DeniedZeroReversalDoctrine'
+   (3) trigger a LearnFromAttempt event for Pattern-I analytics agents
+       (Tree-of-Life, Neuroprint!, AutoChurch) so they MAY update
+       diagnostics and fairness models, but MAY NOT change any capability."
+
+; 4. Required extra diagnostics when reversal is even considered.
+
+ROW,field,extra_diagnostics_on_attempt,bool,true
+
+ROW,invariant,DIAGNOSTIC-EXPANSION,
+  "For each logged reversal attempt, the system MUST:
+   - extend the diagnostic window (HPCC/ERG/TECR) around the attempt,
+   - recompute UNFAIRDRAIN and role-level fairness metrics for the
+     preceding and following epochs,
+   - snapshot BIOTREE/NATURE/GOAL for the subject if available,
+   - attach these as an immutable 'ReversalEvidenceBundle' object
+     to the same .donutloop.aln hash-chain.
+   These bundles are for learning and audit only; they MUST NOT be
+   used to relax ZERO-REVERSAL or any neurorights floors."
+
+; 5. No downgrade semantics anywhere.
+
+ROW,invariant,NO-DOWNGRADE-PATH,
+  "When zeroreversal_enabled = true:
+   - ReversalConditions MUST NOT contain any code path that returns
+     'Allowed' for DOWNGRADE transitions.
+   - CapabilityTransitionRequest of type DOWNGRADE MUST be short-circuited
+     with DeniedZeroReversalDoctrine before any state mutation.
+   - Envelopes MAY tighten minsafe/minwarn, cooldown, or pause tasks,
+     but MUST NOT lower capability tier, rights, or consent."
+
+FOOTER,END-SECTION
