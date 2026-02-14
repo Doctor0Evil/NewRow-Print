@@ -1,0 +1,45 @@
+{
+  "timestamp_ms": 1739145600000,
+  "epoch_index": 42,
+  "subject_id": "microsoc-1d-v1",
+  "lattice_index": 7,
+  "role": "WORKER",
+  "tree": {
+    "DECAY": 0.31,
+    "LIFEFORCE": 0.62,
+    "POWER": 0.48,
+    "FEAR": 0.27,
+    "PAIN": 0.19
+  },
+  "predicates": {
+    "CALM_STABLE": false,
+    "OVERLOADED": true,
+    "RECOVERY": false,
+    "UNFAIR_DRAIN": false,
+    "CORPUS_STALK_SITE": true
+  },
+  "stalk_cluster": {
+    "cluster_id": "0xabc123...",
+    "index_min": 6,
+    "index_max": 8,
+    "epoch_start": 40,
+    "epoch_end": 42,
+    "stalk_density": 11.0
+  },
+  "fate_window": {
+    "id": "fw-2026-02-13T...",
+    "valid": true,
+    "roh_value": 0.22,
+    "roh_critical": false,
+    "overloaded": true,
+    "unfair_drain": false,
+    "stalk_warn": true
+  },
+  "governance": {
+    "roh_ceiling": 0.30,
+    "minsafe_maxsafe_profile": "cap-controlled-human.v1",
+    "no_actuation": true
+  },
+  "hash_prev": "0x...",
+  "hash_self": "0x..."
+}
